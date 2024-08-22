@@ -1,3 +1,4 @@
+use final_project::ThreadPool;
 use std::{
     fs,
     io::{prelude::*, BufReader},
@@ -5,7 +6,6 @@ use std::{
     thread,
     time::Duration,
 };
-use final_project::ThreadPool;
 
 fn main() {
     let listener = TcpListener::bind("127.0.0.1:7878").unwrap();
@@ -13,7 +13,7 @@ fn main() {
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
-        
+
         pool.execute(|| {
             handle_connection(stream);
         });
