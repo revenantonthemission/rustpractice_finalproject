@@ -1,4 +1,7 @@
-use std::thread;
+use std::{
+    sync::{mpsc, Arc, Mutex},
+    thread,
+};
 
 pub struct Worker {
     id: usize,
@@ -6,16 +9,26 @@ pub struct Worker {
 }
 
 impl Worker {
-    pub fn new(id: usize) -> Worker {
+    pub fn new(id: usize, receiver: Arc<Mutex<mpsc::Receiver<Job>>>) -> Worker {
         Worker {
             id: id,
-            thread: thread::spawn(|| {}),
+            thread: thread::spawn(move || loop {
+                let job = receiver.lock().unwrap().recv().unwrap();
+
+                println!("Worker {id} got a job; executing.");
+
+                job();
+            }),
         }
     }
 }
 pub struct ThreadPool {
     workers: Vec<Worker>,
+    sender: mpsc::Sender<Job>,
 }
+
+//struct Job;
+type Job = Box<dyn FnOnce() + Send + 'static>;
 
 impl ThreadPool {
     /// 새로운 스레드 풀을 만든다.
@@ -28,27 +41,23 @@ impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
-        let mut workers: Vec<_> = Vec::with_capacity(size);
+        let (sender, receiver) = mpsc::channel();
+        let receiver = Arc::new(Mutex::new(receiver));
+
+        let mut workers = Vec::with_capacity(size);
 
         for id in 0..size {
             // 스레드를 만들어 threads 벡터 안에 저장한다.
-            let worker = Worker::new(id);
-            workers.push(worker);
+            workers.push(Worker::new(id, Arc::clone(&receiver)));
         }
-        ThreadPool { workers }
-    }
-
-    pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
-    {
+        ThreadPool { workers, sender }
     }
 
     pub fn execute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
+        let job = Box::new(f);
+        self.sender.send(job).unwrap();
     }
 }
