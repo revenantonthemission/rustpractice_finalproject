@@ -1,6 +1,20 @@
 use std::thread;
+
+pub struct Worker {
+    id: usize,
+    thread: thread::JoinHandle<()>,
+}
+
+impl Worker {
+    pub fn new(id: usize) -> Worker {
+        Worker {
+            id: id,
+            thread: thread::spawn(|| {}),
+        }
+    }
+}
 pub struct ThreadPool {
-    threads: Vec<thread::JoinHandle<()>>,
+    workers: Vec<Worker>,
 }
 
 impl ThreadPool {
@@ -14,12 +28,14 @@ impl ThreadPool {
     pub fn new(size: usize) -> ThreadPool {
         assert!(size > 0);
 
-        let mut threads = Vec::with_capacity(size);
+        let mut workers: Vec<_> = Vec::with_capacity(size);
 
-        for _ in 0..size {
+        for id in 0..size {
             // 스레드를 만들어 threads 벡터 안에 저장한다.
+            let worker = Worker::new(id);
+            workers.push(worker);
         }
-        ThreadPool { threads }
+        ThreadPool { workers }
     }
 
     pub fn spawn<F, T>(f: F) -> JoinHandle<T>
